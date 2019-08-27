@@ -143,6 +143,7 @@ static const MemMapEntry base_memmap[] = {
     [VIRT_SMMU] =               { 0x09050000, 0x00020000 },
     [VIRT_PCDIMM_ACPI] =        { 0x09070000, MEMORY_HOTPLUG_IO_LEN },
     [VIRT_ACPI_GED] =           { 0x09080000, ACPI_GED_EVT_SEL_LEN },
+    [VIRT_ICECAP_TIMER] =       { 0x09090000, 0x00001000 },
     [VIRT_MMIO] =               { 0x0a000000, 0x00000200 },
     /* ...repeating for a total of NUM_VIRTIO_TRANSPORTS, each of that size */
     [VIRT_PLATFORM_BUS] =       { 0x0c000000, 0x02000000 },
@@ -183,6 +184,7 @@ static const int a15irqmap[] = {
     [VIRT_GIC_V2M] = 48, /* ...to 48 + NUM_GICV2M_SPIS - 1 */
     [VIRT_SMMU] = 74,    /* ...to 74 + NUM_SMMU_IRQS - 1 */
     [VIRT_PLATFORM_BUS] = 112, /* ...to 112 + PLATFORM_BUS_NUM_IRQS -1 */
+    [VIRT_ICECAP_TIMER] = 112 + PLATFORM_BUS_NUM_IRQS,
 };
 
 static const char *valid_cpus[] = {
@@ -764,6 +766,27 @@ static void create_uart(const VirtMachineState *vms, qemu_irq *pic, int uart,
                                 nodename);
     }
 
+    g_free(nodename);
+}
+
+static void create_icecap_timer(const VirtMachineState *vms, qemu_irq *pic)
+{
+    char *nodename;
+    hwaddr base = vms->memmap[VIRT_ICECAP_TIMER].base;
+    hwaddr size = vms->memmap[VIRT_ICECAP_TIMER].size;
+    int irq = vms->irqmap[VIRT_ICECAP_TIMER];
+    const char compat[] = "icecap,icecap-timer";
+
+    sysbus_create_simple("icecap.timer", base, pic[irq]);
+
+    nodename = g_strdup_printf("/icecap-timer@%" PRIx64, base);
+    qemu_fdt_add_subnode(vms->fdt, nodename);
+    qemu_fdt_setprop(vms->fdt, nodename, "compatible", compat, sizeof(compat));
+    qemu_fdt_setprop_sized_cells(vms->fdt, nodename, "reg",
+                                 2, base, 2, size);
+    qemu_fdt_setprop_cells(vms->fdt, nodename, "interrupts",
+                           GIC_FDT_IRQ_TYPE_SPI, irq,
+                           GIC_FDT_IRQ_FLAGS_LEVEL_HI);
     g_free(nodename);
 }
 
@@ -1726,6 +1749,8 @@ static void machvirt_init(MachineState *machine)
     vms->highmem_ecam &= vms->highmem && (!firmware_loaded || aarch64);
 
     create_rtc(vms, pic);
+
+    create_icecap_timer(vms, pic);
 
     create_pcie(vms, pic);
 
