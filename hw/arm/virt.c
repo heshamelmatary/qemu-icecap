@@ -1770,7 +1770,6 @@ static void machvirt_init(MachineState *machine)
     create_uart(vms, pic, VIRT_UART, sysmem, serial_hd(0));
 
     if (vms->secure) {
-        assert(false);
         create_secure_ram(vms, secure_sysmem);
         create_uart(vms, pic, VIRT_SECURE_UART, secure_sysmem, serial_hd(1));
     }

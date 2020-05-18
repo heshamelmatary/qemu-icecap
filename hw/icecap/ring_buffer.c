@@ -277,7 +277,7 @@ static void icecap_ring_buffer_init(Object *obj)
     sysbus_init_mmio(dev, &s->iomem);
     sysbus_init_irq(dev, &s->irq);
 
-    Chardev *chr = serial_hd(1);
+    Chardev *chr = serial_hd(2); // HACK 0=ns-uart 1=s-uart
     qemu_chr_fe_init(&s->chr, chr, &error_abort);
     qemu_chr_fe_set_handlers(&s->chr, icecap_ring_buffer_can_receive, icecap_ring_buffer_receive, icecap_ring_buffer_event, NULL, s, NULL, true);
 
