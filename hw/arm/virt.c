@@ -145,7 +145,8 @@ static const MemMapEntry base_memmap[] = {
     [VIRT_PCDIMM_ACPI] =        { 0x09070000, MEMORY_HOTPLUG_IO_LEN },
     [VIRT_ACPI_GED] =           { 0x09080000, ACPI_GED_EVT_SEL_LEN },
     [VIRT_ICECAP_TIMER] =       { 0x09090000, 0x00001000 },
-    [VIRT_ICECAP_RING_BUFFER] = { 0x09091000, 0x00001000 },
+    [VIRT_ICECAP_RING_BUFFER_0] = { 0x09091000, 0x00001000 },
+    [VIRT_ICECAP_RING_BUFFER_1] = { 0x09092000, 0x00001000 },
     [VIRT_MMIO] =               { 0x0a000000, 0x00000200 },
     /* ...repeating for a total of NUM_VIRTIO_TRANSPORTS, each of that size */
     [VIRT_PLATFORM_BUS] =       { 0x0c000000, 0x02000000 },
@@ -187,7 +188,8 @@ static const int a15irqmap[] = {
     [VIRT_SMMU] = 74,    /* ...to 74 + NUM_SMMU_IRQS - 1 */
     [VIRT_PLATFORM_BUS] = 112, /* ...to 112 + PLATFORM_BUS_NUM_IRQS -1 */
     [VIRT_ICECAP_TIMER] = 112 + PLATFORM_BUS_NUM_IRQS + 0,
-    [VIRT_ICECAP_RING_BUFFER] = 112 + PLATFORM_BUS_NUM_IRQS + 1,
+    [VIRT_ICECAP_RING_BUFFER_0] = 112 + PLATFORM_BUS_NUM_IRQS + 1,
+    [VIRT_ICECAP_RING_BUFFER_1] = 112 + PLATFORM_BUS_NUM_IRQS + 2,
 };
 
 static const char *valid_cpus[] = {
@@ -793,12 +795,12 @@ static void create_icecap_timer(const VirtMachineState *vms, qemu_irq *pic)
     g_free(nodename);
 }
 
-static void create_icecap_ring_buffer(const VirtMachineState *vms, qemu_irq *pic)
+static void create_icecap_ring_buffer(const VirtMachineState *vms, qemu_irq *pic, int index)
 {
     char *nodename;
-    hwaddr base = vms->memmap[VIRT_ICECAP_RING_BUFFER].base;
-    hwaddr size = vms->memmap[VIRT_ICECAP_RING_BUFFER].size;
-    int irq = vms->irqmap[VIRT_ICECAP_RING_BUFFER];
+    hwaddr base = vms->memmap[index].base;
+    hwaddr size = vms->memmap[index].size;
+    int irq = vms->irqmap[index];
     const char compat[] = "icecap,icecap-ring-buffer";
 
     sysbus_create_simple("icecap.ring-buffer", base, pic[irq]);
@@ -1779,7 +1781,12 @@ static void machvirt_init(MachineState *machine)
     create_rtc(vms, pic);
 
     create_icecap_timer(vms, pic);
-    create_icecap_ring_buffer(vms, pic);
+
+    // HACK 0=ns-uart 1=s-uart
+    icecap_ring_buffer_hack_chardev_ix = 2;
+    create_icecap_ring_buffer(vms, pic, VIRT_ICECAP_RING_BUFFER_0);
+    icecap_ring_buffer_hack_chardev_ix = 3;
+    create_icecap_ring_buffer(vms, pic, VIRT_ICECAP_RING_BUFFER_1);
 
     create_pcie(vms, pic);
 

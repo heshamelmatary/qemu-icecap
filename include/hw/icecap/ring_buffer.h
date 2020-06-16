@@ -40,4 +40,6 @@ typedef struct IceCapRingBufferState {
     uint8_t rx_fifo[ICECAP_RX_FIFO_SIZE];
 } IceCapRingBufferState;
 
+extern int icecap_ring_buffer_hack_chardev_ix;
+
 #endif /* ICECAP_RING_BUFFER_H */
