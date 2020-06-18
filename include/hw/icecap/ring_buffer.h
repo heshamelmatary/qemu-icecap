@@ -9,7 +9,6 @@
 #define ICECAP_RING_BUFFER(obj) OBJECT_CHECK(IceCapRingBufferState, (obj), TYPE_ICECAP_RING_BUFFER)
 
 #define ICECAP_RING_BUFFER_CTRL_SIZE 4096
-#define ICECAP_RX_FIFO_SIZE 0x100000
 
 typedef struct IceCapRingBufferSideLayout {
     hwaddr ctrl;
@@ -35,9 +34,6 @@ typedef struct IceCapRingBufferState {
     CharBackend chr;
     IceCapRingBuffer rb;
     bool enabled;
-    size_t rx_fifo_head;
-    size_t rx_fifo_tail;
-    uint8_t rx_fifo[ICECAP_RX_FIFO_SIZE];
 } IceCapRingBufferState;
 
 extern int icecap_ring_buffer_hack_chardev_ix;

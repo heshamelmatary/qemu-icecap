@@ -144,7 +144,7 @@ static void rb_notify_write(IceCapRingBufferState *s)
     }
 }
 
-static void rb_flush_rx(IceCapRingBufferState *s)
+static void rb_flush(IceCapRingBufferState *s)
 {
     assert(qemu_chr_fe_backend_connected(&s->chr));
     size_t n = rb_poll_read(&s->rb);
@@ -160,53 +160,29 @@ static void rb_flush_rx(IceCapRingBufferState *s)
     rb_notify_read(s);
 }
 
-static void rb_flush_tx(IceCapRingBufferState *s)
-{
-    IceCapRingBuffer *rb = &s->rb;
-    size_t min = MIN((s->rx_fifo_tail - s->rx_fifo_head) % ICECAP_RX_FIFO_SIZE, rb_poll_write(rb));
-    /* if (!min) { */
-    /*     return; */
-    /* } */
-    for (size_t i = 0; i < min; i++) {
-        rb_write(rb, 1, s->rx_fifo + s->rx_fifo_head + i);
-    };
-    s->rx_fifo_head += min;
-    rb_notify_write(s);
-}
-
-static void rb_callback(IceCapRingBufferState *s)
-{
-    rb_flush_tx(s);
-    rb_flush_rx(s);
-}
-
 static int icecap_ring_buffer_can_receive(void *opaque)
 {
     IceCapRingBufferState *s = opaque;
-    return s->enabled;
+    IceCapRingBuffer *rb = &s->rb;
+    if (!s->enabled) {
+        return 0;
+    }
+    return rb_poll_write(rb);
 }
 
 static void icecap_ring_buffer_receive(void *opaque, const uint8_t *buf, int size)
 {
     IceCapRingBufferState *s = opaque;
-
-    assert((s->rx_fifo_head - s->rx_fifo_tail - 1) % ICECAP_RX_FIFO_SIZE + 1> size);
-    size_t n1 = ICECAP_RX_FIFO_SIZE - s->rx_fifo_tail;
-    if (size <= n1)
-        memcpy(s->rx_fifo + s->rx_fifo_tail, buf, size);
-    else {
-        memcpy(s->rx_fifo + s->rx_fifo_tail, buf, n1);
-        memcpy(s->rx_fifo, buf + n1, size - n1);
-    }
-    s->rx_fifo_tail = (s->rx_fifo_tail + size) % ICECAP_RX_FIFO_SIZE;
-
-    rb_callback(s);
+    IceCapRingBuffer *rb = &s->rb;
+    assert(size <= rb_poll_write(rb));
+    rb_write(rb, size, buf);
+    rb_notify_write(s);
 }
 
 static void icecap_ring_buffer_event(void *opaque, int event)
 {
-    IceCapRingBufferState *s = opaque;
-    rb_callback(s);
+    // IceCapRingBufferState *s = opaque;
+    // TODO
 }
 
 static void icecap_ring_buffer_enable(IceCapRingBufferState *s)
@@ -243,7 +219,8 @@ static void icecap_ring_buffer_write(void *opaque, hwaddr offset, uint64_t value
             switch(value) {
                 case VAL_NOTIFY:
                     assert(s->enabled);
-                    rb_callback(s);
+                    qemu_chr_fe_accept_input(&s->chr); // notify change in can_receive
+                    rb_flush(s);
                     break;
                 case VAL_ACK:
                     /* TODO should be edge-triggered */
@@ -280,9 +257,6 @@ static void icecap_ring_buffer_init(Object *obj)
     Chardev *chr = serial_hd(icecap_ring_buffer_hack_chardev_ix);
     qemu_chr_fe_init(&s->chr, chr, &error_abort);
     qemu_chr_fe_set_handlers(&s->chr, icecap_ring_buffer_can_receive, icecap_ring_buffer_receive, icecap_ring_buffer_event, NULL, s, NULL, true);
-
-    s->rx_fifo_head = 0;
-    s->rx_fifo_tail = 0;
 
     s->enabled = false;
 }
